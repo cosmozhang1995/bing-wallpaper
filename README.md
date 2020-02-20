@@ -16,3 +16,9 @@ Run `crontab -e` to edit your `crontab` file. Append the following line to it:
 ```
 
 As this crontab entry demands, `crontab` will execute the spider on each day's 12:00.
+
+### Web Browser
+
+A webpage for browsing the stored wallpapers has been deploy. Please [visit here](http://www.cosmozhang.com/bing-wallpaper/).
+
+The webpage is deployed on GitHub page. Source codes are maintained on the [gh-pages branch](https://github.com/cosmozhang1995/bing-wallpaper/tree/gh-pages).
