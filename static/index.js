@@ -47,7 +47,7 @@ const config = await (await fetch(window.location.pathname + "static/config.json
 window.oss = new OSS(config.oss);
 
 // image list request methods
-const pagesize = 5;
+const pagesize = 15;
 let marker = undefined;
 let loading = false;
 let completed = false;
