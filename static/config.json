@@ -1,0 +1,8 @@
+{
+    "oss": {
+        "accessKeyId": "LTAI4FpVgtwc48YhouXrWSmF",
+        "accessKeySecret": "pk3sLVej66yytD4YEMEoAHSvoRHJSk",
+        "bucket": "bing-wallpapers",
+        "region": "oss-cn-beijing"
+    }
+}

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Bing Wallpapers</title>
+        <!-- <link rel="stylesheet/css" type="text/css" href="https://cdn.bootcss.com/font-awesome/5.12.1/css/all.min.css" /> -->
+        <!-- <link rel="stylesheet/less" href="/static/style.less" /> -->
+        <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" />
+    </head>
+    <body>
+        <div class="navbar">
+            <div class="container">
+                <div class="brand">
+                    <img src="/static/brand.png" />
+                    <!-- <span>Bing Wallpapers</span> -->
+                </div>
+                <div class="filter-bar" id="filter-bar-inactive">
+                    <a class="button button-filter" id="button-filter"></a>
+                </div>
+                <div class="filter-bar" id="filter-bar-active" style="display: none;">
+                    <a class="button button-prev" id="button-filter-prev"></a>
+                    <div class="select" id="filter-select-year" empty-value="----" tooltip="Year filter" placement="left">
+                        <a class="button button-text"></a>
+                        <div class="select-options">
+                            <div class="row">
+                                <a class="button button-text" id="button-filter-year-prev">...</a>
+                                <a class="button button-text button-option">2033</a>
+                                <a class="button button-text button-option">2011</a>
+                                <a class="button button-text button-option">2012</a>
+                            </div>
+                            <div class="row">
+                                <a class="button button-text button-option">2013</a>
+                                <a class="button button-text button-option">2014</a>
+                                <a class="button button-text button-option">2015</a>
+                                <a class="button button-text button-option">2016</a>
+                            </div>
+                            <div class="row">
+                                <a class="button button-text button-option">2017</a>
+                                <a class="button button-text button-option">2018</a>
+                                <a class="button button-text button-option">2019</a>
+                                <a class="button button-text" id="button-filter-year-next">...</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="select" id="filter-select-month" empty-value="--" tooltip="Month filter" placement="right">
+                        <a class="button button-text"></a>
+                        <div class="select-options">
+                            <div class="row">
+                                <a class="button button-text button-option">Jan</a>
+                                <a class="button button-text button-option">Feb</a>
+                                <a class="button button-text button-option">Mar</a>
+                                <a class="button button-text button-option">Apr</a>
+                            </div>
+                            <div class="row">
+                                <a class="button button-text button-option">May</a>
+                                <a class="button button-text button-option">Jun</a>
+                                <a class="button button-text button-option">Jul</a>
+                                <a class="button button-text button-option">Aug</a>
+                            </div>
+                            <div class="row">
+                                <a class="button button-text button-option">Sep</a>
+                                <a class="button button-text button-option">Oct</a>
+                                <a class="button button-text button-option">Nov</a>
+                                <a class="button button-text button-option">Dec</a>
+                            </div>
+                        </div>
+                    </div>
+                    <a class="button button-next" id="button-filter-next"></a>
+                    <a class="button button-close" id="button-filter-close" tooltip="CLEAR all filters" placement="bottom"></a>
+                </div>
+            </div>
+        </div>
+        <div class="container main-page">
+            <div class="container image-list" id="image-list">
+            </div>
+            <div class="image-list-bottom" id="image-list-bottom">
+                <span class="slogan" id="slogan-loading">Loading...</span>
+                <span class="slogan" id="slogan-complete">All wallpapers have been loaded.</span>
+                <span class="slogan" id="slogan-empty">There are no wallpapers here.</span>
+            </div>
+            <div style="height: 0; overflow: hidden;">
+                <div class="image-item" id="image-item-template">
+                    <div class="image-item-placeholder">
+                        <span class="loading-icon"></span>
+                    </div>
+                    <div class="image-item-static-cover"></div>
+                    <img class="image-item-image" />
+                    <div class="image-item-cover"></div>
+                </div>
+            </div>
+        </div>
+        <div class="footbar">
+            <div class="container" style="height: 0;">
+                <div class="footbar-topline"></div>
+            </div>
+            <div class="container">
+                <div>
+                    <span>2020 Copyright reserved by </span>
+                    <a target="_blank" href="http://www.cosmozhang.com/about.html">Cosmo Zhang</a>
+                    <span>&nbsp;&nbsp;&nbsp;</span>
+                    <a target="_blank" href="javascript:;"><img src="/static/github.png" style="width: 1.5rem; height: 1.5rem; position: relative; top: 0.3rem;" /></a>
+                </div>
+            </div>
+        </div>
+        <div class="image-viewer-background" id="image-viewer-background" style="display: none;">
+            <div class="image-viewer-wrapper" id="image-viewer-wrapper">
+                <div class="image-viewer" id="image-viewer">
+                    <div class="image-viewer-placeholder" id="image-viewer-placeholder">
+                        <span class="loading-icon"></span>
+                        <div class="loading-icon-cover"></div>
+                    </div>
+                    <img class="image-viewer-image" id="image-viewer-image" style="display: none;" />
+                    <a class="view-button prev" id="image-viewer-prev"></a>
+                    <a class="view-button next" id="image-viewer-next"></a>
+                    <a class="view-button close" id="image-viewer-close"></a>
+                    <img class="image-viewer-preload" id="image-viewer-preload" />
+                </div>
+            </div>
+        </div>
+    </body>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/vue"></script> -->
+    <script src="https://cdn.bootcss.com/lodash.js/4.17.15/lodash.min.js"></script>
+    <script src="https://cdn.bootcss.com/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdn.bootcss.com/jquery-mousewheel/3.1.13/jquery.mousewheel.min.js"></script>
+    <script src="http://gosspublic.alicdn.com/aliyun-oss-sdk-6.4.0.min.js"></script>
+    <!-- <script src="https://cdn.bootcss.com/font-awesome/5.12.1/js/fontawesome.min.js"></script> -->
+    <script src="https://cdn.bootcss.com/less.js/3.11.1/less.min.js"></script>
+    <script src="/static/index.js"></script>
+</html>
