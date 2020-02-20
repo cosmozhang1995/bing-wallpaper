@@ -2,8 +2,8 @@ $(document).ready(async () => {
 
 // load and compile stylesheet
 (await Promise.all([
-    "/static/style.less",
-    "/static/tooltip.less"
+    window.location.pathname + "static/style.less",
+    window.location.pathname + "static/tooltip.less"
 ].map(async (path) => {
     let styleless = await (await fetch(path)).text();
     let stylecss = await less.render(styleless, {
@@ -41,7 +41,7 @@ let $FilterSelectYear = $("#filter-select-year");
 let $FilterSelectMonth = $("#filter-select-month");
 
 // load config file
-const config = await (await fetch("/static/config.json")).json();
+const config = await (await fetch(window.location.pathname + "static/config.json")).json();
 
 // create OSS client
 window.oss = new OSS(config.oss);
