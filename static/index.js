@@ -61,6 +61,8 @@ const setLoading = (value) => {
     }
     else {
         $ImageListBottomEl.removeClass("loading");
+        if ($("#image-list .image-item").length == 0) $ImageListBottomEl.addClass("empty");
+        else $ImageListBottomEl.removeClass("empty");
     }
 };
 const setComplete = (value) => {
