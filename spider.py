@@ -5,6 +5,7 @@ import requests
 import json
 from configparser import ConfigParser
 import logging
+import re
 
 # detect the current directory
 currdir = os.path.realpath(os.path.dirname(__file__))
@@ -28,6 +29,61 @@ if use_log:
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+
+# notify functions
+notify_config = config["notify"] if "notify" in config else {}
+notify_format = None
+notify_type = "text"
+if "format.text" in notify_config:
+    notify_format = config.get("notify", "format.text")
+    if len(notify_format) >= 2 and ( \
+            (notify_format[0] == '"' and notify_format[-1] == '"') or \
+            (notify_format[0] == "'" and notify_format[-1] == "'")):
+        notify_format = eval(notify_format)
+if "format.file" in notify_config:
+    notify_format_file = config.get("notify", "format.file")
+    if len(notify_format_file) > 0:
+        notify_format_file = os.path.realpath(os.path.expandvars(notify_format_file))
+        if os.path.isfile(notify_format_file):
+            with open(notify_format_file, "r") as f:
+                notify_format = f.read()
+            if notify_format_file.split(".")[-1].lower() in ["md", "markdown"]:
+                notify_type = "markdown"
+def notify(**kwargs):
+    if notify_format is None or len(notify_format) == 0:
+        return
+    notify_content = notify_format.format(**kwargs)
+    if "dingtalk" in notify_config and config.getboolean("notify", "dingtalk"):
+        if notify_type == "markdown":
+            msgobj = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "title": re.sub(r"^\#+", "", notify_content.split("\n")[0]).strip(),
+                    "text": notify_content
+                },
+            }
+        else:
+            msgobj = {
+                "msgtype": "text",
+                "text": {
+                    "content": notify_content
+                }
+            }
+        response = requests.post(
+            "https://oapi.dingtalk.com/robot/send?access_token=%s" % config.get("notify", "dingtalk.accessToken"),
+            json.dumps(msgobj),
+            headers = { "Content-Type": "application/json" }
+        )
+        print(response.content.decode("utf-8"))
+        if response.status_code != 200:
+            sys.stderr.write("[WARN] Failed to notify DingTalk\n")
+            logger.warning("Failed to notify DingTalk.")
+        else:
+            response = response.json()
+            if response["errcode"] != 0:
+                sys.stderr.write("[WARN] Failed to notify DingTalk. Error: %d (%s).\n" % (response["errcode"], response["errmsg"]))
+                logger.warning("Failed to notify DingTalk. Error: %d (%s)." % (response["errcode"], response["errmsg"]))
+
 
 # print start log
 logger.info("Task started.")
@@ -161,9 +217,13 @@ for i in range(len(images)):
     # set item_status
     item_status[i] = STATUS_SUCCESS
 
+# summary
+num_success = len(list(filter(lambda s: s == STATUS_SUCCESS, item_status)))
+num_failed = len(list(filter(lambda s: s == STATUS_FAILED, item_status)))
+num_skipped = len(list(filter(lambda s: s == STATUS_SKIPPED, item_status)))
+
 # print complete log
-logger.info("Task done: %d successful, %d failed, %d skipped." % (
-    len(list(filter(lambda s: s == STATUS_SUCCESS, item_status))),
-    len(list(filter(lambda s: s == STATUS_FAILED, item_status))),
-    len(list(filter(lambda s: s == STATUS_SKIPPED, item_status)))
-))
+logger.info("Task done: %d successful, %d failed, %d skipped." % (num_success, num_failed, num_skipped))
+
+# notify
+notify(success=num_success, failed=num_failed, skipped=num_skipped)
