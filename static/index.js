@@ -14,6 +14,21 @@ $(document).ready(async () => {
     $('<style type="text/css">' + stylecss.css + '</style>').appendTo("head");
 });
 
+// wait for preload images
+await (() => {
+    let promises = [];
+    $(".image-preloads img").each((i, el) => {
+        promises.push(new Promise((resolve, reject) => {
+            el.onload = resolve;
+            if (el.completed) {
+                el.onload = null;
+                resolve();
+            }
+        }));
+    });
+    return Promise.all(promises);
+})();
+
 // show page
 $(".page-load").remove();
 
