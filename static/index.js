@@ -23,6 +23,7 @@ await (() => {
             el.onerror = reject;
             if (el.completed) {
                 el.onload = null;
+                el.onerror = null;
                 resolve();
             }
         }));
