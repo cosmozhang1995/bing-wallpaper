@@ -14,6 +14,9 @@ $(document).ready(async () => {
     $('<style type="text/css">' + stylecss.css + '</style>').appendTo("head");
 });
 
+// show page
+$(".page-load").remove();
+
 // prepare some DOM objects
 let $ImageItemTplEl = $("#image-item-template");
 let imageItemSize = {
