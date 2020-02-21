@@ -20,6 +20,7 @@ await (() => {
     $(".image-preloads img").each((i, el) => {
         promises.push(new Promise((resolve, reject) => {
             el.onload = resolve;
+            el.onerror = reject;
             if (el.completed) {
                 el.onload = null;
                 resolve();
