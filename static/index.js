@@ -21,7 +21,7 @@ await (() => {
         promises.push(new Promise((resolve, reject) => {
             el.onload = resolve;
             el.onerror = reject;
-            if (el.completed) {
+            if (el.complete) {
                 el.onload = null;
                 el.onerror = null;
                 resolve();
