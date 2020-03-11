@@ -6,6 +6,7 @@ import json
 from configparser import ConfigParser
 import logging
 import re
+import hashlib
 
 # detect the current directory
 currdir = os.path.realpath(os.path.dirname(__file__))
@@ -14,6 +15,7 @@ currdir = os.path.realpath(os.path.dirname(__file__))
 config = ConfigParser()
 config.read(os.path.join(currdir, "config.conf"))
 use_history = config.getboolean("behavior", "history")
+if use_history: max_history = config.getint("behavior", "max_history")
 use_log = config.getboolean("log", "enable")
 if use_log: log_path = os.path.realpath(os.path.expandvars(config.get("log", "path")))
 
@@ -89,10 +91,16 @@ def notify(**kwargs):
 logger.info("Task started.")
 
 # get history list
+class HistoryItem:
+    def __init__(self, hsh=None, sha=None):
+        self.hsh = hsh
+        self.sha = sha
+    def __str__(self):
+        return "{}:{}".format(self.hsh or "", self.sha or "")
 history = []
 if use_history and os.path.isfile(os.path.join(currdir, ".history")):
     with open(os.path.join(currdir, ".history"), "r") as f:
-        history = [line.strip() for line in f.readlines()]
+        history = [HistoryItem(*[x.strip() for x in line.strip().split(":")]) for line in f.readlines()]
 
 # request the Bing wallpaper list
 response = requests.get("https://cn.bing.com/HPImageArchive.aspx?format=js&idx=0&n=100&ensearch=1&FORM=BEHPTB")
@@ -109,11 +117,20 @@ images = response["images"]
 auth = oss2.Auth(config.get("oss", "accessKeyId"), config.get("oss", "accessKeySecret"))
 bucket = oss2.Bucket(auth, config.get("oss", "endpoint"), config.get("oss", "bucket"))
 
-def append_history(hshid):
+def find_history(hsh=None, sha=None):
+    if hsh is not None:
+        return (list(filter(lambda item: item.hsh == hsh, history)) + [None])[0]
+    elif sha is not None:
+        return (list(filter(lambda item: item.sha == sha, history)) + [None])[0]
+    else:
+        return None
+def append_history(**kwargs):
     if use_history:
-        history.append(hshid)
+        global history
+        history.append(HistoryItem(**kwargs))
+        history = history[-max_history:]
         with open(os.path.join(currdir, ".history"), "w") as f:
-            f.write("\n".join(history))
+            f.write("\n".join([str(item) for item in history]))
 
 def desc_date_str(datestr):
     newyear = 9999 - int(datestr[0:4])
@@ -132,41 +149,33 @@ STATUS_SKIPPED = 0
 STATUS_FAILED = -1
 STATUS_SUCCESS = 1
 item_status = [STATUS_SKIPPED for item in images]
+item_download = [False for item in images]
 
 # upload the images
 for i in range(len(images)):
     imageitem = images[i]
     if "hsh" not in imageitem: continue
     hshid = imageitem["hsh"]
-    if use_history and hshid in history: continue
+    if use_history and find_history(hsh=hshid) is not None: continue
     if "startdate" not in imageitem: continue
-    filename = desc_date_str(imageitem["startdate"]) + "-" + hshid
-    # search if image exists
-    imagefileprefix = "image/" + filename
-    file_exist = True
-    try:
-        next(oss2.ObjectIterator(bucket, prefix=imagefileprefix))
-    except StopIteration as err:
-        file_exist = False
-    except:
-        sys.stderr.write("[WARN] Failed to detect file %s\n" % imagefileprefix)
-        continue
-    if file_exist:
-        append_history(hshid)
-        continue
+    startdate = imageitem["startdate"]
     # set item_status
     item_status[i] = STATUS_FAILED
-    # upload the info file
-    infofilename = "info/%s.json" % filename
-    sys.stdout.write("uploading %s ..." % infofilename)
-    result = bucket.put_object(infofilename, json.dumps(imageitem))
-    if result.status != 200:
-        sys.stderr.write("[WARN] Failed to upload info file for %s\n" % hshid)
-        sys.stdout.write("Error.\n")
-        logger.warning("Upload %s FAILED." % infofilename)
+    # search if image exists
+    hsh2sha_filename = "hsh2sha/" + hshid + ".sha256"
+    file_exist = True
+    try:
+        next(oss2.ObjectIterator(bucket, prefix=hsh2sha_filename))
+    except StopIteration as err:
+        file_exist = False
+    except Exception as e:
+        import traceback
+        sys.stderr.write("[WARN] Failed to detect hsh2sha file %s\n" % hsh2sha_filename)
         continue
-    sys.stdout.write("OK.\n")
-    logger.info("Upload %s SUCCESS." % infofilename)
+    if file_exist:
+        append_history(hsh=hshid, sha=None)
+        item_status[i] = STATUS_SKIPPED
+        continue
     # download the image
     imgurl = "https://cn.bing.com/hpwp/%s" % hshid
     sys.stdout.write("downloading %s ..." % imgurl)
@@ -189,41 +198,83 @@ for i in range(len(images)):
         sys.stderr.write("[WARN] Failed to download image %s\n" % hshid)
         continue
     if "Content-Type" not in response.headers:
-        sys.stderr.write("[WARN] Image %s has unknown MIME type\n" % hshid)
         sys.stdout.write("Error.\n")
+        sys.stderr.write("[WARN] Image %s has unknown MIME type\n" % hshid)
         logger.warning("Image %s has unknown MIME type." % hshid)
         continue
     mimetype = response.headers["Content-Type"]
     if mimetype not in mime2suffix:
-        sys.stderr.write("[WARN] Image %s has unknown MIME type \"%s\"\n" % (hshid, mimetype))
         sys.stdout.write("Error.\n")
+        sys.stderr.write("[WARN] Image %s has unknown MIME type \"%s\"\n" % (hshid, mimetype))
         logger.warning("Image %s has unknown MIME type \"%s\"." % (hshid, mimetype))
         continue
     sys.stdout.write("OK.\n")
     suffix = mime2suffix[mimetype]
-    # upload the image
-    imagefilename = "image/%s.%s" % (filename, suffix)
-    sys.stdout.write("uploading %s ..." % imagefilename)
-    result = bucket.put_object(imagefilename, response.content)
+    shahex = hashlib.sha256(response.content).hexdigest()
+    filename = desc_date_str(imageitem["startdate"]) + "-" + shahex
+    item_download[i] = True
+    # search if image exists
+    if use_history and find_history(sha=shahex) is not None:
+        item_status[i] = STATUS_SKIPPED
+        continue
+    filename_prefix = "image/" + filename
+    file_exist = True
+    try:
+        next(oss2.ObjectIterator(bucket, prefix=filename_prefix))
+    except StopIteration as err:
+        file_exist = False
+    except:
+        sys.stderr.write("[WARN] Failed to detect image file %s\n" % filename_prefix)
+        continue
+    if file_exist:
+        append_history(hsh=hshid, sha=shahex)
+        item_status[i] = STATUS_SKIPPED
+    else:
+        # upload the info file
+        infofilename = "info/%s.json" % filename
+        sys.stdout.write("uploading %s ..." % infofilename)
+        result = bucket.put_object(infofilename, json.dumps(imageitem))
+        if result.status != 200:
+            sys.stdout.write("Error.\n")
+            sys.stderr.write("[WARN] Failed to upload info file for %s\n" % hshid)
+            logger.warning("Upload %s FAILED." % infofilename)
+            continue
+        sys.stdout.write("OK.\n")
+        logger.info("Upload %s SUCCESS." % infofilename)
+        # upload the image
+        imagefilename = "image/%s.%s" % (filename, suffix)
+        sys.stdout.write("uploading %s ..." % imagefilename)
+        result = bucket.put_object(imagefilename, response.content)
+        if result.status != 200:
+            sys.stderr.write("[WARN] Failed to upload image %s\n" % hshid)
+            sys.stdout.write("Error.\n")
+            logger.warning("Upload %s FAILED." % imagefilename)
+            continue
+        sys.stdout.write("OK.\n")
+        logger.info("Upload %s SUCCESS." % imagefilename)
+        # append history
+        append_history(hsh=hshid, sha=shahex)
+        # set item_status
+        item_status[i] = STATUS_SUCCESS
+    # upload the hsh2sha file
+    sys.stdout.write("uploading %s ..." % hsh2sha_filename)
+    result = bucket.put_object(hsh2sha_filename, shahex)
     if result.status != 200:
-        sys.stderr.write("[WARN] Failed to upload image %s\n" % hshid)
         sys.stdout.write("Error.\n")
-        logger.warning("Upload %s FAILED." % imagefilename)
+        sys.stderr.write("[WARN] Failed to upload hsh2sha file for %s\n" % hshid)
+        logger.warning("Upload %s FAILED." % hsh2sha_filename)
         continue
     sys.stdout.write("OK.\n")
-    logger.info("Upload %s SUCCESS." % imagefilename)
-    # append history
-    append_history(hshid)
-    # set item_status
-    item_status[i] = STATUS_SUCCESS
+    logger.info("Upload %s SUCCESS." % hsh2sha_filename)
 
 # summary
 num_success = len(list(filter(lambda s: s == STATUS_SUCCESS, item_status)))
 num_failed = len(list(filter(lambda s: s == STATUS_FAILED, item_status)))
 num_skipped = len(list(filter(lambda s: s == STATUS_SKIPPED, item_status)))
+num_downloaded = len(list(filter(lambda s: s, item_download)))
 
 # print complete log
-logger.info("Task done: %d successful, %d failed, %d skipped." % (num_success, num_failed, num_skipped))
+logger.info("Task done: %d downloaded, %d successful, %d failed, %d skipped." % (num_downloaded, num_success, num_failed, num_skipped))
 
 # notify
-notify(success=num_success, failed=num_failed, skipped=num_skipped)
+notify(success=num_success, failed=num_failed, skipped=num_skipped, downloaded=num_downloaded)
